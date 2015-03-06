@@ -1,170 +1,135 @@
 <?php
-if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
+include_once "common.skin.php";
+include_once(G5_CAPTCHA_PATH.'/captcha.lib.php');
+$captcha_html = "";
+if ($is_guest && $board['bo_comment_level'] < 2) {
+    $captcha_html = captcha_html('_comment');
+    $captcha_html = str_replace("required", "required='true'", $captcha_html);
+    $captcha_html = preg_replace("/<input[^<>]+/", "$0 /", $captcha_html);
+    $captcha_html = preg_replace("/<img[^<>]+/", "$0 /", $captcha_html);
+}
+
+header('Content-Type: text/xsl');
+
+echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 ?>
+<xsl:stylesheet  xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+<xsl:template name="comments">
+    <script>
+    <![CDATA[
+        // 글자수 제한
+        var char_min = parseInt(<?php echo $comment_min ?>); // 최소
+        var char_max = parseInt(<?php echo $comment_max ?>); // 최대
+    ]]>
+    </script>
+    <section id="bo_vc">
+        <h2>댓글목록</h2>
+        <xsl:choose>
+        <xsl:when test="board_view/comments/comment/*">
+            <xsl:for-each select="board_view/comments/comment">
+                <xsl:apply-templates select=".">
+                    <xsl:with-param name="margin-left" select="0"/>
+                </xsl:apply-templates>
+            </xsl:for-each>
+        </xsl:when>
+        <xsl:otherwise>
+            <p id="bo_vc_empty">등록된 댓글이 없습니다.</p>
+        </xsl:otherwise>
+        </xsl:choose>
+    </section>
+    <!-- } 댓글 끝 -->
 
-<script>
-// 글자수 제한
-var char_min = parseInt(<?php echo $comment_min ?>); // 최소
-var char_max = parseInt(<?php echo $comment_max ?>); // 최대
-</script>
+    <xsl:if test="board_view/comments/comment_writable = 'true'">
+        <!-- 댓글 쓰기 시작 { -->
+        <aside id="bo_vc_w">
+            <h2>댓글쓰기</h2>
+            <form name="fviewcomment" action="./write_comment_update.php" onsubmit="return fviewcomment_submit(this);" method="post" autocomplete="off">
+            <xsl:choose>
+            <xsl:when test="board_view/other_params/w">
+                <input type="hidden" name="w" value="{board_view/other_params/w}" id="w" />
+            </xsl:when>
+            <xsl:otherwise>
+                <input type="hidden" name="w" value="c" id="w" />
+            </xsl:otherwise>
+            </xsl:choose>
 
-<!-- 댓글 시작 { -->
-<section id="bo_vc">
-    <h2>댓글목록</h2>
-    <?php
-    $cmt_amt = count($list);
-    for ($i=0; $i<$cmt_amt; $i++) {
-        $comment_id = $list[$i]['wr_id'];
-        $cmt_depth = ""; // 댓글단계
-        $cmt_depth = strlen($list[$i]['wr_comment_reply']) * 20;
-        $comment = $list[$i]['content'];
-        /*
-        if (strstr($list[$i]['wr_option'], "secret")) {
-            $str = $str;
-        }
-        */
-        $comment = preg_replace("/\[\<a\s.*href\=\"(http|https|ftp|mms)\:\/\/([^[:space:]]+)\.(mp3|wma|wmv|asf|asx|mpg|mpeg)\".*\<\/a\>\]/i", "<script>doc_write(obj_movie('$1://$2.$3'));</script>", $comment);
-        $cmt_sv = $cmt_amt - $i + 1; // 댓글 헤더 z-index 재설정 ie8 이하 사이드뷰 겹침 문제 해결
-     ?>
+            <input type="hidden" name="bo_table" value="{board_view/board_info/bo_table}" />
+            <input type="hidden" name="wr_id" value="{board_view/wr_id}" />
+            <input type="hidden" name="comment_id" value="{board_view/other_params/c_id}" id="comment_id" />
+            <input type="hidden" name="sca" value="{board_view/search/sca}" />
+            <input type="hidden" name="sfl" value="{board_view/search/sfl}" />
+            <input type="hidden" name="stx" value="{board_view/search/stx}" />
+            <input type="hidden" name="spt" value="{board_view/search/spt}" />
+            <input type="hidden" name="page" value="{board_view/other_params/page}" />
+            <input type="hidden" name="is_good" value="" />
 
-    <article id="c_<?php echo $comment_id ?>" <?php if ($cmt_depth) { ?>style="margin-left:<?php echo $cmt_depth ?>px;border-top-color:#e0e0e0"<?php } ?>>
-        <header style="z-index:<?php echo $cmt_sv; ?>">
-            <h1><?php echo get_text($list[$i]['wr_name']); ?>님의 댓글</h1>
-            <?php echo $list[$i]['name'] ?>
-            <?php if ($cmt_depth) { ?><img src="<?php echo $board_skin_url ?>/img/icon_reply.gif" class="icon_reply" alt="댓글의 댓글"><?php } ?>
-            <?php if ($is_ip_view) { ?>
-            아이피
-            <span class="bo_vc_hdinfo"><?php echo $list[$i]['ip']; ?></span>
-            <?php } ?>
-            작성일
-            <span class="bo_vc_hdinfo"><time datetime="<?php echo date('Y-m-d\TH:i:s+09:00', strtotime($list[$i]['datetime'])) ?>"><?php echo $list[$i]['datetime'] ?></time></span>
-            <?php
-            include(G5_SNS_PATH.'/view_comment_list.sns.skin.php');
-            ?>
-        </header>
+            <div class="tbl_frm01 tbl_wrap">
+                <table>
+                <tbody>
+                <?php if ($is_guest) { ?>
+                <tr>
+                    <th scope="row"><label for="wr_name">이름<strong class="sound_only"> 필수</strong></label></th>
+                    <td><input type="text" name="wr_name" value="<?php echo get_cookie("ck_sns_name"); ?>" id="wr_name" required='true' class="frm_input required" size="5" maxLength="20" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="wr_password">비밀번호<strong class="sound_only"> 필수</strong></label></th>
+                    <td><input type="password" name="wr_password" id="wr_password" required='true' class="frm_input required" size="10" maxLength="20" /></td>
+                </tr>
+                <?php } ?>
+                <tr>
+                    <th scope="row"><label for="wr_secret">비밀글사용</label></th>
+                    <td><input type="checkbox" name="wr_secret" value="secret" id="wr_secret" /></td>
+                </tr>
+                <?php if ($is_guest) { ?>
+                <tr>
+                    <th scope="row">자동등록방지</th>
+                    <td><?php echo $captcha_html; ?></td>
+                </tr>
+                <?php } ?>
+                <?php
+                if($board['bo_use_sns'] && ($config['cf_facebook_appid'] || $config['cf_twitter_key'])) {
+                ?>
+                <tr>
+                    <th scope="row">SNS 동시등록</th>
+                    <td id="bo_vc_send_sns"></td>
+                </tr>
+                <?php
+                }
+                ?>
+                <tr>
+                    <th scope="row">내용</th>
+                    <td>
+                        <?php if ($comment_min || $comment_max) { ?><strong id="char_cnt"><span id="char_count"></span>글자</strong><?php } ?>
+                        <textarea id="wr_content" name="wr_content" maxlength="10000" required='true' class="required" title="내용"
+                        <?php if ($comment_min || $comment_max) { ?>onkeyup="check_byte('wr_content', 'char_count');"<?php } ?>><xsl:value-of select="/board_view/other_params/c_wr_content" /></textarea>
+                        <?php if ($comment_min || $comment_max) { ?><script> check_byte('wr_content', 'char_count'); </script><?php } ?>
+                        <script>
+                        <![CDATA[
+                        $("textarea#wr_content[maxlength]").live("keyup change", function() {
+                            var str = $(this).val()
+                            var mx = parseInt($(this).attr("maxlength"))
+                            if (str.length > mx) {
+                                $(this).val(str.substr(0, mx));
+                                return false;
+                            }
+                        });
+                        ]]>
+                        </script>
+                    </td>
+                </tr>
+                </tbody>
+                </table>
+            </div>
 
-        <!-- 댓글 출력 -->
-        <p>
-            <?php if (strstr($list[$i]['wr_option'], "secret")) { ?><img src="<?php echo $board_skin_url; ?>/img/icon_secret.gif" alt="비밀글"><?php } ?>
-            <?php echo $comment ?>
-        </p>
+            <div class="btn_confirm">
+                <input type="submit" id="btn_submit" class="btn_submit" value="댓글등록"/>
+            </div>
 
-        <span id="edit_<?php echo $comment_id ?>"></span><!-- 수정 -->
-        <span id="reply_<?php echo $comment_id ?>"></span><!-- 답변 -->
+            </form>
+        </aside>
 
-        <input type="hidden" value="<?php echo strstr($list[$i]['wr_option'],"secret") ?>" id="secret_comment_<?php echo $comment_id ?>">
-        <textarea id="save_comment_<?php echo $comment_id ?>" style="display:none"><?php echo get_text($list[$i]['content1'], 0) ?></textarea>
-
-        <?php if($list[$i]['is_reply'] || $list[$i]['is_edit'] || $list[$i]['is_del']) {
-            $query_string = str_replace("&", "&amp;", $_SERVER['QUERY_STRING']);
-
-            if($w == 'cu') {
-                $sql = " select wr_id, wr_content from $write_table where wr_id = '$c_id' and wr_is_comment = '1' ";
-                $cmt = sql_fetch($sql);
-                $c_wr_content = $cmt['wr_content'];
-            }
-
-            $c_reply_href = './board.php?'.$query_string.'&amp;c_id='.$comment_id.'&amp;w=c#bo_vc_w';
-            $c_edit_href = './board.php?'.$query_string.'&amp;c_id='.$comment_id.'&amp;w=cu#bo_vc_w';
-         ?>
-        <footer>
-            <ul class="bo_vc_act">
-                <?php if ($list[$i]['is_reply']) { ?><li><a href="<?php echo $c_reply_href;  ?>" onclick="comment_box('<?php echo $comment_id ?>', 'c'); return false;">답변</a></li><?php } ?>
-                <?php if ($list[$i]['is_edit']) { ?><li><a href="<?php echo $c_edit_href;  ?>" onclick="comment_box('<?php echo $comment_id ?>', 'cu'); return false;">수정</a></li><?php } ?>
-                <?php if ($list[$i]['is_del'])  { ?><li><a href="<?php echo $list[$i]['del_link'];  ?>" onclick="return comment_delete();">삭제</a></li><?php } ?>
-            </ul>
-        </footer>
-        <?php } ?>
-    </article>
-    <?php } ?>
-    <?php if ($i == 0) { //댓글이 없다면 ?><p id="bo_vc_empty">등록된 댓글이 없습니다.</p><?php } ?>
-
-</section>
-<!-- } 댓글 끝 -->
-
-<?php if ($is_comment_write) {
-    if($w == '')
-        $w = 'c';
-?>
-<!-- 댓글 쓰기 시작 { -->
-<aside id="bo_vc_w">
-    <h2>댓글쓰기</h2>
-    <form name="fviewcomment" action="./write_comment_update.php" onsubmit="return fviewcomment_submit(this);" method="post" autocomplete="off">
-    <input type="hidden" name="w" value="<?php echo $w ?>" id="w">
-    <input type="hidden" name="bo_table" value="<?php echo $bo_table ?>">
-    <input type="hidden" name="wr_id" value="<?php echo $wr_id ?>">
-    <input type="hidden" name="comment_id" value="<?php echo $c_id ?>" id="comment_id">
-    <input type="hidden" name="sca" value="<?php echo $sca ?>">
-    <input type="hidden" name="sfl" value="<?php echo $sfl ?>">
-    <input type="hidden" name="stx" value="<?php echo $stx ?>">
-    <input type="hidden" name="spt" value="<?php echo $spt ?>">
-    <input type="hidden" name="page" value="<?php echo $page ?>">
-    <input type="hidden" name="is_good" value="">
-
-    <div class="tbl_frm01 tbl_wrap">
-        <table>
-        <tbody>
-        <?php if ($is_guest) { ?>
-        <tr>
-            <th scope="row"><label for="wr_name">이름<strong class="sound_only"> 필수</strong></label></th>
-            <td><input type="text" name="wr_name" value="<?php echo get_cookie("ck_sns_name"); ?>" id="wr_name" required class="frm_input required" size="5" maxLength="20"></td>
-        </tr>
-        <tr>
-            <th scope="row"><label for="wr_password">비밀번호<strong class="sound_only"> 필수</strong></label></th>
-            <td><input type="password" name="wr_password" id="wr_password" required class="frm_input required" size="10" maxLength="20"></td>
-        </tr>
-        <?php } ?>
-        <tr>
-            <th scope="row"><label for="wr_secret">비밀글사용</label></th>
-            <td><input type="checkbox" name="wr_secret" value="secret" id="wr_secret"></td>
-        </tr>
-        <?php if ($is_guest) { ?>
-        <tr>
-            <th scope="row">자동등록방지</th>
-            <td><?php echo $captcha_html; ?></td>
-        </tr>
-        <?php } ?>
-        <?php
-        if($board['bo_use_sns'] && ($config['cf_facebook_appid'] || $config['cf_twitter_key'])) {
-        ?>
-        <tr>
-            <th scope="row">SNS 동시등록</th>
-            <td id="bo_vc_send_sns"></td>
-        </tr>
-        <?php
-        }
-        ?>
-        <tr>
-            <th scope="row">내용</th>
-            <td>
-                <?php if ($comment_min || $comment_max) { ?><strong id="char_cnt"><span id="char_count"></span>글자</strong><?php } ?>
-                <textarea id="wr_content" name="wr_content" maxlength="10000" required class="required" title="내용"
-                <?php if ($comment_min || $comment_max) { ?>onkeyup="check_byte('wr_content', 'char_count');"<?php } ?>><?php echo $c_wr_content;  ?></textarea>
-                <?php if ($comment_min || $comment_max) { ?><script> check_byte('wr_content', 'char_count'); </script><?php } ?>
-                <script>
-                $("textarea#wr_content[maxlength]").live("keyup change", function() {
-                    var str = $(this).val()
-                    var mx = parseInt($(this).attr("maxlength"))
-                    if (str.length > mx) {
-                        $(this).val(str.substr(0, mx));
-                        return false;
-                    }
-                });
-                </script>
-            </td>
-        </tr>
-        </tbody>
-        </table>
-    </div>
-
-    <div class="btn_confirm">
-        <input type="submit" id="btn_submit" class="btn_submit" value="댓글등록">
-    </div>
-
-    </form>
-</aside>
-
-<script>
+        <script>
+<![CDATA[
 var save_before = '';
 var save_html = document.getElementById('bo_vc_w').innerHTML;
 
@@ -312,7 +277,9 @@ function comment_delete()
     return confirm("이 댓글을 삭제하시겠습니까?");
 }
 
-comment_box('', 'c'); // 댓글 입력폼이 보이도록 처리하기위해서 추가 (root님)
+$(document).ready(function(){
+    comment_box('', 'c'); // 댓글 입력폼이 보이도록 처리하기위해서 추가 (root님)
+});
 
 <?php if($board['bo_use_sns'] && ($config['cf_facebook_appid'] || $config['cf_twitter_key'])) { ?>
 // sns 등록
@@ -325,6 +292,70 @@ $(function() {
     );
 });
 <?php } ?>
-</script>
-<?php } ?>
-<!-- } 댓글 쓰기 끝 -->
+]]>
+        </script>
+        <!-- } 댓글 쓰기 끝 -->
+    </xsl:if>
+</xsl:template>
+
+
+
+<xsl:template match="comment">
+    <xsl:param name="margin-left" />
+    <article id="c_{id}" style="margin-left: {$margin-left}px; border-top-color:#e0e0e0">
+        <!-- 댓글 헤더 -->
+        <header style="z-index: {/board_view/wr_comment - show_idx}">
+            <h1><xsl:value-of select="wr_name" />님의 댓글</h1>
+            <xsl:value-of select="name" />
+            <xsl:if test="$margin-left &gt; 0">
+                <img src="<?php echo $board_skin_url ?>/img/icon_reply.gif" class="icon_reply" alt="댓글의 댓글" />
+            </xsl:if>
+            <xsl:if test="/board_view/board_info/use_ip = 'true'">
+                아이피
+                <span class="bo_vc_hdinfo"><xsl:value-of select="ip" /></span>
+            </xsl:if>
+            작성일
+            <span class="bo_vc_hdinfo"><time datetime="{datetime2}"><xsl:value-of select="datetime" /></time></span>
+            <![CDATA[
+            <?php
+            include(G5_SNS_PATH.'/view_comment_list.sns.skin.php');
+            ?>
+            ]]>
+        </header>
+        <!-- 댓글 출력 -->
+        <p>
+            <xsl:if test="is_secret = 'true'">
+                <img src="<?php echo $board_skin_url; ?>/img/icon_secret.gif" alt="비밀글" />
+            </xsl:if>
+            <xsl:copy-of select="content" />
+        </p>
+        <span id="edit_{id}"></span><!-- 수정 -->
+        <span id="reply_{id}"></span><!-- 답변 -->
+        <input type="hidden" value="{is_secret}" id="secret_comment_{id}" />
+        <textarea id="save_comment_{id}" style="display:none"><xsl:value-of select="content1" /></textarea>
+        <xsl:if test="can_reply = 'true' or can_edit = 'true' or can_delete = 
+    'true'">
+            <footer>
+                <ul class="bo_vc_act">
+                    <xsl:if test="can_reply = 'true'">
+                        <li><a href="./board.php?{/board_view/query_string}&amp;c_id={id}&amp;w=c#bo_vc_w" onclick="comment_box('{id}', 'c'); return false;">답변</a></li>
+                    </xsl:if>
+                    <xsl:if test="can_edit = 'true'">
+                        <li><a href="./board.php?{/board_view/query_string}&amp;c_id={id}&amp;w=cu#bo_vc_w" onclick="comment_box('{id}', 'cu'); return false;">수정</a></li>
+                    </xsl:if>
+                    <xsl:if test="can_delete = 'true'">
+                        <li><a href="{del_link}" onclick="return comment_delete();">삭제</a></li>
+                    </xsl:if>
+                </ul>
+            </footer>
+        </xsl:if>
+    </article>
+    <xsl:if test="comments">
+        <xsl:for-each select="comments/comment">
+            <xsl:apply-templates select=".">
+                <xsl:with-param name="margin-left" select="$margin-left + 20" />
+            </xsl:apply-templates>
+        </xsl:for-each>
+    </xsl:if>
+</xsl:template>
+</xsl:stylesheet>

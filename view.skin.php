@@ -83,9 +83,7 @@ for($i = 0; $i < count($view['file']); $i++){
 <?php
 $tmpView = get_view_thumbnail($file['view']);
 $tmpView = preg_replace("/<img[^<>]+/", "$0 /", $tmpView);
-//$tmpView = str_replace("<img", "<view_img", $tmpView);
-//$tmpView = str_replace("<a", "<view_a", $tmpView);
-//$tmpView = str_replace("</a", "</view_a", $tmpView);
+$tmpView = str_replace("/ /", " /", $tmpView);
 ?>
             <view><?=$tmpView?></view>
             <download><?=$file['download']?></download>

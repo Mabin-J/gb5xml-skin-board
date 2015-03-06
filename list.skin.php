@@ -5,7 +5,6 @@ header('Content-Type: text/xml');
 
 $showFields = Array(
     "wr_id",
-    "is_notice",
     "num",
     "ca_name",
     "ca_name_href",
@@ -63,6 +62,7 @@ foreach ($list as $item){
 <?php
     }
 ?>
+            <is_notice><?=$item['is_notice']?"true":"false"?></is_notice>
         </item>
 <?php
 }
